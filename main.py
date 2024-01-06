@@ -7,7 +7,7 @@ from torchvision import transforms
 from tqdm import tqdm
 from Dataset import FingerprintingDataset
 from Preprocessing import Normalizer
-from Vanilla 
+# from Vanilla 
 
 
 
@@ -24,8 +24,8 @@ def execPipeline():
     # 1. Define dataset, transforms and loader
     trainDataset = FingerprintingDataset(rootDir=pathToData)
     normalizer = Normalizer(rssMin=trainDataset.getRssMin())
-    trainDataset.transform = transforms.Compose([normalizer(), transforms.ToTensor()])
-    trainDataset.targetTransform = transforms.ToTensor()
+    trainDataset.transform = transforms.Compose([normalizer, torch.from_numpy])
+    trainDataset.targetTransform = torch.from_numpy
     trainDataloader = DataLoader(
         dataset=trainDataset,
         batch_size=64,
@@ -33,6 +33,9 @@ def execPipeline():
         num_workers=4
     )
 
+    inputs, classes = iter(trainDataloader).next()
+    print(inputs.shape)
+    print(classes.shape)
 
 
     # Training procedure
@@ -63,11 +66,17 @@ def getDataset():
             data = np.genfromtxt(pathToData, delimiter=',')
             #print(data.shape)
             #print(f'Concatting {file}')
-            match datasetKind:
-                case 'trn':
-                    rssTrain = np.append(rssTrain, data, axis=0)
-                case 'tst':
-                    rssTest = np.append(rssTest, data, axis=0)
+            if datasetKind == 'trn':
+                rssTrain = np.append(rssTrain, data, axis=0)
+            else:
+                rssTest = np.append(rssTest, data, axis=0)
+
+
+            # match datasetKind:
+            #     case 'trn':
+            #         rssTrain = np.append(rssTrain, data, axis=0)
+            #     case 'tst':
+            #         rssTest = np.append(rssTest, data, axis=0)
 
     print('Done')
     print(rssTrain.shape)
@@ -93,9 +102,9 @@ if __name__ == "__main__":
     #getDataset()
 
     # Run training, evaluation and gather statistics for selected model
-    match selectedModel:
-        case 'Vanilla':
-            execPipeline()
+    # match selectedModel:
+    #     case 'Vanilla':
+    execPipeline()
 
     
 
