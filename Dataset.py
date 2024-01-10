@@ -39,7 +39,13 @@ class FingerprintingDataset(Dataset):
             for file in posFiles:
                 pathToData = f'{root}/{file}'
                 data = np.genfromtxt(pathToData, delimiter=',')
-                posData = np.append(posData, data, axis=0)
+
+                # Transform labels to binary classification problem where floor 5 corresponds to 1
+                # and floor 3 corresponds to 0
+                newData = data
+                newData[:, 2] = np.where(newData[:, 2] == 5, 1, 0)
+
+                posData = np.append(posData, newData, axis=0)
         
         self.data = rssData
         self.labels = posData
@@ -60,8 +66,11 @@ class FingerprintingDataset(Dataset):
         if self.targetTransform:
             label = self.targetTransform(label)
 
+        labelReg = label[[0,1]]
+        labelClass = label[[2]]
+
         # return sample and labels
-        return sample, label
+        return sample.long(), labelReg.float(), labelClass
     
     def getRssMin(self):
         return self.data.min()

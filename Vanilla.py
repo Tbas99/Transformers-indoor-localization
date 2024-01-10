@@ -22,6 +22,7 @@ class Embedding(nn.Module):
         Returns:
             out: embedding vector
         """
+
         out = self.embed(x)
         return out
 
@@ -229,7 +230,8 @@ class VanillaTransformer(nn.Module):
         """
 
         self.encoder = TransformerEncoder(seq_length, src_vocab_size, embed_dim, num_layers=num_layers, expansion_factor=expansion_factor, n_heads=n_heads)
-        self.fcc = nn.Linear(embed_dim, 3)
+        self.hidden = nn.Linear(158720, 512)
+        self.fcc = nn.Linear(512, 3)
 
     def forward(self, x):
         """
@@ -239,6 +241,8 @@ class VanillaTransformer(nn.Module):
             out: final vector which returns tuple (x,y,floor) with floor the floornumber
         """
         enc_out = self.encoder(x)
-        out = self.fcc(enc_out)
+        out = torch.flatten(enc_out, 1)
+        out = self.hidden(out)
+        out = self.fcc(out)
 
         return out

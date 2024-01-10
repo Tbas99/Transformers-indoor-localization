@@ -7,8 +7,8 @@ from torchvision import transforms
 from tqdm import tqdm
 from Dataset import FingerprintingDataset
 from Preprocessing import Normalizer
-# from Vanilla 
-
+from Vanilla import VanillaTransformer
+from Utils import train_single_epoch, eval_single_epoch
 
 
 
@@ -33,13 +33,55 @@ def execPipeline():
         num_workers=4
     )
 
-    inputs, classes = iter(trainDataloader).next()
-    print(inputs.shape)
-    print(classes.shape)
+    testDataset = FingerprintingDataset(rootDir=pathToData, test=True)
+    normalizer = Normalizer(rssMin=testDataset.getRssMin())
+    testDataset.transform = transforms.Compose([normalizer, torch.from_numpy])
+    testDataset.targetTransform = torch.from_numpy
+    testDataloader = DataLoader(
+        dataset=testDataset,
+        batch_size=64,
+        shuffle=False,
+        num_workers=4
+    )
 
+
+    # 2. Define model and training parameters
+    model = VanillaTransformer(
+        embed_dim=256,
+        src_vocab_size=200,
+        seq_length=620,
+        num_layers=2,
+        expansion_factor=4,
+        n_heads=8)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    regressionLossFunction = torch.nn.MSELoss()
+    classificationLossFunction = torch.nn.BCEWithLogitsLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     # Training procedure
-    #for epoch in range(epochs):
+    for epoch in range(epochs):
+        print(f'EPOCH {epoch}:')
+
+        train_single_epoch(
+            dataloader=trainDataloader, 
+            model=model,
+            regressionLossFn=regressionLossFunction,
+            classificationLossFn=classificationLossFunction,
+            optimizer=optimizer,
+            device=device
+        )
+
+        eval_single_epoch(
+            dataloader=testDataloader,
+            model=model,
+            regressionLossFn=regressionLossFunction,
+            classificationLossFn=classificationLossFunction,
+            device=device
+        )
+
+
+
 
 
 
@@ -98,6 +140,19 @@ if __name__ == "__main__":
 
     # Define constants
     selectedModel = AVAILABLE_MODELS[0]
+
+    # As = np.array([[1,2],[3,4],[5,6]])
+    # Bs = np.array([[3,4],[3,4],[7,8]])
+
+    # Cd = np.sqrt(np.sum((As - Bs)**2, axis=1))
+
+    # As = torch.from_numpy(As)
+    # Bs = torch.from_numpy(Bs)
+
+    # Cs = torch.sqrt(torch.sum((As - Bs)**2, dim=1))
+
+    # print(Cd)
+    # print(Cs)
 
     #getDataset()
 
