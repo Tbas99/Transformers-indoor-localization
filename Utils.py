@@ -19,13 +19,18 @@ def train_single_epoch(dataloader, model, regressionLossFn, classificationLossFn
             yHatReg = logits[:, [0,1]]
             yHatClass = logits[:, [2]]
             
+            # print(yHatReg.shape)
+            # print(yHatReg)
+            # print(yReg.shape)
+            # print(yReg)
+
             # -- Backprop
             optimizer.zero_grad()
             lossRegression = regressionLossFn(yHatReg, yReg)
             lossClassification = classificationLossFn(yHatClass, yClass)
             loss = lossRegressionWeight * lossRegression + lossClassification
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+            #torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
 
             # -- Compute metrics - Regression

@@ -8,6 +8,9 @@ from tqdm import tqdm
 from Dataset import FingerprintingDataset
 from Preprocessing import Normalizer
 from Vanilla import VanillaTransformer
+from BERT import BERT
+from Linformer import Linformer
+from Simple import Classic
 from Utils import train_single_epoch, eval_single_epoch
 
 
@@ -16,48 +19,43 @@ from Utils import train_single_epoch, eval_single_epoch
 
 
 
-def execPipeline():
+def execPipeline(model):
     # Define important variables
     pathToData = f'{os.getcwd()}/dataset/db'
-    epochs = 20
+    epochs = 5
 
     # 1. Define dataset, transforms and loader
     trainDataset = FingerprintingDataset(rootDir=pathToData)
-    normalizer = Normalizer(rssMin=trainDataset.getRssMin())
-    trainDataset.transform = transforms.Compose([normalizer, torch.from_numpy])
+    normalizer = Normalizer(rssMin=trainDataset.getRssMin() - 1)
+    #trainDataset.transform = transforms.Compose([normalizer, torch.from_numpy])
+    trainDataset.transform = torch.from_numpy
     trainDataset.targetTransform = torch.from_numpy
     trainDataloader = DataLoader(
         dataset=trainDataset,
-        batch_size=64,
+        batch_size=32,
         shuffle=True,
         num_workers=4
     )
 
     testDataset = FingerprintingDataset(rootDir=pathToData, test=True)
-    normalizer = Normalizer(rssMin=testDataset.getRssMin())
-    testDataset.transform = transforms.Compose([normalizer, torch.from_numpy])
+    normalizer = Normalizer(rssMin=testDataset.getRssMin() - 1)
+    #testDataset.transform = transforms.Compose([normalizer, torch.from_numpy])
+    testDataset.transform = torch.from_numpy
     testDataset.targetTransform = torch.from_numpy
     testDataloader = DataLoader(
         dataset=testDataset,
-        batch_size=64,
+        batch_size=32,
         shuffle=False,
         num_workers=4
     )
 
 
-    # 2. Define model and training parameters
-    model = VanillaTransformer(
-        embed_dim=256,
-        src_vocab_size=200,
-        seq_length=620,
-        num_layers=2,
-        expansion_factor=4,
-        n_heads=8)
+    # 2. Define training parameters
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     regressionLossFunction = torch.nn.MSELoss()
     classificationLossFunction = torch.nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
 
     # Training procedure
     for epoch in range(epochs):
@@ -135,11 +133,14 @@ def getDataset():
     print(normalizedValues.max())
 
 
+
 if __name__ == "__main__":
+    torch.cuda.empty_cache()
+
     AVAILABLE_MODELS = ['Vanilla', 'Perceiver', 'Linformer', 'BERT']
 
     # Define constants
-    selectedModel = AVAILABLE_MODELS[0]
+    selectedModel = AVAILABLE_MODELS[2]
 
     # As = np.array([[1,2],[3,4],[5,6]])
     # Bs = np.array([[3,4],[3,4],[7,8]])
@@ -154,12 +155,33 @@ if __name__ == "__main__":
     # print(Cd)
     # print(Cs)
 
-    #getDataset()
-
     # Run training, evaluation and gather statistics for selected model
-    # match selectedModel:
-    #     case 'Vanilla':
-    execPipeline()
+    if selectedModel == "BERT":
+        model = BERT(
+            embed_dim=96,
+            hidden_size=512,
+            src_vocab_size=200,
+            seq_length=620
+        )
+    elif selectedModel == "Perceiver":
+        model = Classic()
+    elif selectedModel == "Linformer":
+        model = Linformer(
+            dim=512,
+            seq_len=620,
+            depth=6
+        )
+    else:
+        model = VanillaTransformer(
+            embed_dim=256,
+            src_vocab_size=200,
+            seq_length=620,
+            num_layers=2,
+            expansion_factor=4,
+            n_heads=8
+        )
+
+    execPipeline(model=model)
 
     
 

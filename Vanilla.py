@@ -241,6 +241,7 @@ class VanillaTransformer(nn.Module):
             out: final vector which returns tuple (x,y,floor) with floor the floornumber
         """
         enc_out = self.encoder(x)
+
         out = torch.flatten(enc_out, 1)
         out = self.hidden(out)
         out = self.fcc(out)
