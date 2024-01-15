@@ -1,5 +1,4 @@
 from tqdm import tqdm
-import numpy as np
 import torch
 
 def train_single_epoch(dataloader, model, regressionLossFn, classificationLossFn, optimizer, device):
@@ -18,11 +17,6 @@ def train_single_epoch(dataloader, model, regressionLossFn, classificationLossFn
             logits = model(x)
             yHatReg = logits[:, [0,1]]
             yHatClass = logits[:, [2]]
-            
-            # print(yHatReg.shape)
-            # print(yHatReg)
-            # print(yReg.shape)
-            # print(yReg)
 
             # -- Backprop
             optimizer.zero_grad()
@@ -58,6 +52,10 @@ def eval_single_epoch(dataloader, model, regressionLossFn, classificationLossFn,
     correctFloorPredsTotal = 0
     sizeTotal = 0
 
+    lossRegressionEval = 0
+    lossClassificationEval = 0
+    avgPointwiseEucDist = 0
+
     with torch.no_grad():
         with tqdm(dataloader, unit="batch") as tepoch:
             for x, yReg, yClass in tepoch:
@@ -75,6 +73,7 @@ def eval_single_epoch(dataloader, model, regressionLossFn, classificationLossFn,
 
                 # -- Compute metrics - Regression
                 pointwiseEucDist = torch.sqrt(torch.sum((yHatReg - yReg)**2, dim=1))
+                avgPointwiseEucDist += pointwiseEucDist.detach().cpu().numpy().sum()
                 avgDistanceError = pointwiseEucDist.mean()
                 
                 # -- Compute metrics - Classification
@@ -91,3 +90,14 @@ def eval_single_epoch(dataloader, model, regressionLossFn, classificationLossFn,
                     lossReg=lossRegression.item(),
                     distError=avgDistanceError.item()
                 )
+
+                lossRegressionEval += lossRegression.detach().cpu().item()
+                lossClassificationEval += lossClassification.detach().cpu().item()
+
+    # Compute stats
+    alpha = len(dataloader)
+    lossRegressionEval /= alpha
+    lossClassificationEval /= alpha
+    avgPointwiseEucDist /= len(dataloader.dataset)
+
+    return lossRegressionEval, lossClassificationEval, classificationAccuracy, avgPointwiseEucDist

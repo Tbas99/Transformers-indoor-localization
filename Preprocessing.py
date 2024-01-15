@@ -14,5 +14,5 @@ class Normalizer(object):
         normalizedSamples = np.where(
             samples == 100,
             0,
-            ((samples - self.rssMin) / (-self.rssMin))**np.e)
+            (samples - self.rssMin))
         return normalizedSamples

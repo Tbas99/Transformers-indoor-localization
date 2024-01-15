@@ -2,6 +2,8 @@ import os
 import re
 import numpy as np
 import torch
+import time
+import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
@@ -16,10 +18,7 @@ from Utils import train_single_epoch, eval_single_epoch
 
 
 
-
-
-
-def execPipeline(model):
+def execPipeline(model, experimentName):
     # Define important variables
     pathToData = f'{os.getcwd()}/dataset/db'
     epochs = 5
@@ -27,8 +26,8 @@ def execPipeline(model):
     # 1. Define dataset, transforms and loader
     trainDataset = FingerprintingDataset(rootDir=pathToData)
     normalizer = Normalizer(rssMin=trainDataset.getRssMin() - 1)
-    #trainDataset.transform = transforms.Compose([normalizer, torch.from_numpy])
-    trainDataset.transform = torch.from_numpy
+    trainDataset.transform = transforms.Compose([normalizer, torch.from_numpy])
+    #trainDataset.transform = torch.from_numpy
     trainDataset.targetTransform = torch.from_numpy
     trainDataloader = DataLoader(
         dataset=trainDataset,
@@ -39,8 +38,8 @@ def execPipeline(model):
 
     testDataset = FingerprintingDataset(rootDir=pathToData, test=True)
     normalizer = Normalizer(rssMin=testDataset.getRssMin() - 1)
-    #testDataset.transform = transforms.Compose([normalizer, torch.from_numpy])
-    testDataset.transform = torch.from_numpy
+    testDataset.transform = transforms.Compose([normalizer, torch.from_numpy])
+    #testDataset.transform = torch.from_numpy
     testDataset.targetTransform = torch.from_numpy
     testDataloader = DataLoader(
         dataset=testDataset,
@@ -55,12 +54,19 @@ def execPipeline(model):
     model.to(device)
     regressionLossFunction = torch.nn.MSELoss()
     classificationLossFunction = torch.nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+
+    epochRegLoss = np.empty(shape=(1, epochs))
+    epochClassLoss = np.empty(shape=(1, epochs))
+    epochAcc = np.empty(shape=(1, epochs))
+    epochDistError = np.empty(shape=(1, epochs))
+    epochTrainingTime = 0
 
     # Training procedure
     for epoch in range(epochs):
         print(f'EPOCH {epoch}:')
 
+        start = time.time()
         train_single_epoch(
             dataloader=trainDataloader, 
             model=model,
@@ -69,8 +75,10 @@ def execPipeline(model):
             optimizer=optimizer,
             device=device
         )
+        end = time.time()
+        epochTrainingTime += (end - start)
 
-        eval_single_epoch(
+        regLoss, classLoss, acc, distError = eval_single_epoch(
             dataloader=testDataloader,
             model=model,
             regressionLossFn=regressionLossFunction,
@@ -78,82 +86,104 @@ def execPipeline(model):
             device=device
         )
 
+        epochRegLoss[0, epoch] = regLoss
+        epochClassLoss[0, epoch] = classLoss
+        epochAcc[0, epoch] = acc
+        epochDistError[0, epoch] = distError
 
+    # Save results
+    avgEpochTrainingTime = epochTrainingTime / epochs
+    print("--- Average epoch training time: %s seconds ---" % (avgEpochTrainingTime))
+    np.savetxt(f'{experimentName}.out', (epochRegLoss.flatten(), epochClassLoss.flatten(), epochAcc.flatten(), epochDistError.flatten()))
 
+    x = range(1, epochs + 1)
+    fig1, (ax1, ax2)  = plt.subplots(1, 2)
+    ax1.plot(x, epochRegLoss.flatten(), c='b')
+    ax1.set_title("Regression Loss Curve", fontsize=16)
+    ax1.set_xticks(x)
+    ax1.set_ylabel('Loss', fontsize=12)
+    ax1.set_xlabel('Epoch', fontsize=12)
+    ax2.plot(x, epochClassLoss.flatten(), c='r')
+    ax2.set_title('Classification Loss Curve', fontsize=16)
+    ax2.set_xticks(x)
+    ax2.set_ylabel('Loss', fontsize=12)
+    ax2.set_xlabel('Epoch', fontsize=12)
+    fig1.tight_layout()
+    plt.savefig(f'{experimentName}_lossCurve.jpeg', dpi=1200)
 
+    fig2, ax3 = plt.subplots()
+    ax3.plot(x, epochAcc.flatten()*100)
+    ax3.set_title("Classification Accuracy", fontsize=16)
+    ax3.set_xlabel('Epoch', fontsize=12)
+    ax3.set_xticks(x)
+    ax3.set_ylabel('Accuracy (%)', fontsize=12)
+    fig2.tight_layout()
+    plt.savefig(f'{experimentName}_accuracy.jpeg', dpi=1200)
 
+    fig3, ax4 = plt.subplots()
+    ax4.plot(x, epochDistError.flatten())
+    ax4.set_title("Average Euclidean Difference", fontsize=16)
+    ax4.set_xlabel('Epoch', fontsize=12)
+    ax4.set_xticks(x)
+    ax4.set_ylabel('Distance error (m)', fontsize=12)
+    fig3.tight_layout()
+    plt.savefig(f'{experimentName}_error.jpeg', dpi=1200)
 
+def test():
+    arr = np.loadtxt('epoch_results.out')
+    print(arr)
 
+    regLoss = arr[0, :]
+    classLoss = arr[1, :]
+    acc = arr[2, :]
+    err = arr[3, :]
 
-def getDataset():
-    pathToData = f'{os.getcwd()}/dataset/db'
+    print(regLoss)
+    print(regLoss.shape)
 
-    rssTrain = np.zeros((0,620))
-    rssTest = np.zeros((0,620))
+    x = range(1, 6)
 
-    for root, _, files in os.walk(pathToData):
-        # First iteration is through the root, skip it.
-        if root == pathToData:
-            continue
-        
-        # Read RSS file and store data
-        rssFiles = list(filter(lambda k: 'rss' in k, files))
-        for file in rssFiles:
-            m = re.match(r'(.{3})(.{2})(.{3})\.csv', file)
-            datasetKind, measurementNumber, dataType = m.group(1, 2, 3)
+    fig1, (ax1, ax2)  = plt.subplots(1, 2)
+    ax1.plot(x, regLoss, c='b')
+    ax1.set_title("Regression Loss Curve", fontsize=16)
+    ax1.set_xticks(x)
+    ax1.set_ylabel('Loss', fontsize=12)
+    ax1.set_xlabel('Epoch', fontsize=12)
+    ax2.plot(x, classLoss, c='r')
+    ax2.set_title('Classification Loss Curve', fontsize=16)
+    ax2.set_xticks(x)
+    ax2.set_ylabel('Loss', fontsize=12)
+    ax2.set_xlabel('Epoch', fontsize=12)
+    fig1.tight_layout()
+    plt.show()
 
-            pathToData = f'{root}/{file}'
-            data = np.genfromtxt(pathToData, delimiter=',')
-            #print(data.shape)
-            #print(f'Concatting {file}')
-            if datasetKind == 'trn':
-                rssTrain = np.append(rssTrain, data, axis=0)
-            else:
-                rssTest = np.append(rssTest, data, axis=0)
+    fig2, ax3 = plt.subplots()
+    ax3.plot(x, acc*100)
+    ax3.set_title("Classification Accuracy", fontsize=16)
+    ax3.set_xlabel('Epoch', fontsize=12)
+    ax3.set_xticks(x)
+    ax3.set_ylabel('Accuracy (%)', fontsize=12)
+    fig2.tight_layout()
+    plt.show()
 
-
-            # match datasetKind:
-            #     case 'trn':
-            #         rssTrain = np.append(rssTrain, data, axis=0)
-            #     case 'tst':
-            #         rssTest = np.append(rssTest, data, axis=0)
-
-    print('Done')
-    print(rssTrain.shape)
-    print(rssTrain)
-    print(rssTest.shape)
-    print(rssTest)
-    print(len(rssTrain))
-
-    rssMin = rssTrain.min()
-    normalizer = Normalizer(rssMin=rssMin)
-    normalizedValues = normalizer(rssTrain)
-    print(normalizedValues.shape)
-    print(normalizedValues.min())
-    print(normalizedValues.max())
-
+    fig3, ax4 = plt.subplots()
+    ax4.plot(x, err)
+    ax4.set_title("Average Euclidean Difference", fontsize=16)
+    ax4.set_xlabel('Epoch', fontsize=12)
+    ax4.set_xticks(x)
+    ax4.set_ylabel('Distance error (m)', fontsize=12)
+    fig3.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":
     torch.cuda.empty_cache()
+    os.environ['CUDA_LAUNCH_BLOCKING']="1"
 
     AVAILABLE_MODELS = ['Vanilla', 'Perceiver', 'Linformer', 'BERT']
 
     # Define constants
-    selectedModel = AVAILABLE_MODELS[2]
-
-    # As = np.array([[1,2],[3,4],[5,6]])
-    # Bs = np.array([[3,4],[3,4],[7,8]])
-
-    # Cd = np.sqrt(np.sum((As - Bs)**2, axis=1))
-
-    # As = torch.from_numpy(As)
-    # Bs = torch.from_numpy(Bs)
-
-    # Cs = torch.sqrt(torch.sum((As - Bs)**2, dim=1))
-
-    # print(Cd)
-    # print(Cs)
+    selectedModel = AVAILABLE_MODELS[0]
 
     # Run training, evaluation and gather statistics for selected model
     if selectedModel == "BERT":
@@ -174,14 +204,14 @@ if __name__ == "__main__":
     else:
         model = VanillaTransformer(
             embed_dim=256,
-            src_vocab_size=200,
+            src_vocab_size=100,
             seq_length=620,
             num_layers=2,
             expansion_factor=4,
             n_heads=8
         )
 
-    execPipeline(model=model)
+    execPipeline(model=model, experimentName=selectedModel)
 
     
 

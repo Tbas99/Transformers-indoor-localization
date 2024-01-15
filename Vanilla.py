@@ -22,7 +22,6 @@ class Embedding(nn.Module):
         Returns:
             out: embedding vector
         """
-
         out = self.embed(x)
         return out
 
@@ -107,7 +106,7 @@ class MultiHeadAttention(nn.Module):
         value = value.view(batch_size, seq_length, self.n_heads, self.single_head_dim) #(32x10x8x64)
        
         k = self.key_matrix(key)       # (32x10x8x64)
-        q = self.query_matrix(query)   
+        q = self.query_matrix(query)
         v = self.value_matrix(value)
 
         q = q.transpose(1,2)  # (batch_size, n_heads, seq_len, single_head_dim)    # (32 x 8 x 10 x 64)
@@ -230,8 +229,7 @@ class VanillaTransformer(nn.Module):
         """
 
         self.encoder = TransformerEncoder(seq_length, src_vocab_size, embed_dim, num_layers=num_layers, expansion_factor=expansion_factor, n_heads=n_heads)
-        self.hidden = nn.Linear(158720, 512)
-        self.fcc = nn.Linear(512, 3)
+        self.fcc = nn.Linear(158720, 3)
 
     def forward(self, x):
         """
@@ -241,9 +239,8 @@ class VanillaTransformer(nn.Module):
             out: final vector which returns tuple (x,y,floor) with floor the floornumber
         """
         enc_out = self.encoder(x)
-
+        
         out = torch.flatten(enc_out, 1)
-        out = self.hidden(out)
         out = self.fcc(out)
 
         return out
