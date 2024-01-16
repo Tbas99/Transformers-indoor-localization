@@ -229,7 +229,7 @@ class VanillaTransformer(nn.Module):
         """
 
         self.encoder = TransformerEncoder(seq_length, src_vocab_size, embed_dim, num_layers=num_layers, expansion_factor=expansion_factor, n_heads=n_heads)
-        self.fcc = nn.Linear(158720, 3)
+        self.fcc = nn.Linear(seq_length*embed_dim, 3)
 
     def forward(self, x):
         """

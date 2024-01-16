@@ -1,27 +1,23 @@
 import os
-import re
 import numpy as np
 import torch
 import time
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from tqdm import tqdm
 from Dataset import FingerprintingDataset
 from Preprocessing import Normalizer
 from Vanilla import VanillaTransformer
 from BERT import BERT
 from Linformer import Linformer
-from Simple import Classic
+from Perceiver import PerceiverIO
 from Utils import train_single_epoch, eval_single_epoch
-
-
 
 
 def execPipeline(model, experimentName):
     # Define important variables
     pathToData = f'{os.getcwd()}/dataset/db'
-    epochs = 5
+    epochs = 20
 
     # 1. Define dataset, transforms and loader
     trainDataset = FingerprintingDataset(rootDir=pathToData)
@@ -54,7 +50,7 @@ def execPipeline(model, experimentName):
     model.to(device)
     regressionLossFunction = torch.nn.MSELoss()
     classificationLossFunction = torch.nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, betas=[0.9, 0.98], eps=10e-9)
 
     epochRegLoss = np.empty(shape=(1, epochs))
     epochClassLoss = np.empty(shape=(1, epochs))
@@ -194,7 +190,14 @@ if __name__ == "__main__":
             seq_length=620
         )
     elif selectedModel == "Perceiver":
-        model = Classic()
+        model = PerceiverIO(
+            depth=4,
+            dim=512,
+            logits_dim=3,
+            num_latents=256,
+            latent_dim=512,
+            seq_dropout_prob=0.2
+        )
     elif selectedModel == "Linformer":
         model = Linformer(
             dim=512,
@@ -202,11 +205,16 @@ if __name__ == "__main__":
             depth=6
         )
     else:
+        # Base model includes:
+        # N = 6 Layers
+        # D_model = 512
+        # h = 8 heads
+        # No dropout
         model = VanillaTransformer(
-            embed_dim=256,
+            embed_dim=512,
             src_vocab_size=100,
             seq_length=620,
-            num_layers=2,
+            num_layers=6,
             expansion_factor=4,
             n_heads=8
         )

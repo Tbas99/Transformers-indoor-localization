@@ -17,10 +17,8 @@ class FingerprintingDataset(Dataset):
         rssData = np.zeros((0,620))
         posData = np.zeros((0,3))
         for root, _, files in os.walk(rootDir):
-            print(root)
             # Hard stop to reduce dataset size
             if root == 'C:\\Projects\\Others\\Transformers-indoor-localization/dataset/db\\06':
-                print('breaking now')
                 break
             
             # First iteration is through the root, skip it.
