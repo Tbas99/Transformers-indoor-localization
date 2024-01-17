@@ -11,6 +11,9 @@ from Vanilla import VanillaTransformer
 from BERT import BERT
 from Linformer import Linformer
 from Perceiver import PerceiverIO
+from LSTMModel import LSTMModel
+from Hsieh import MLPRSS, CNNRSS
+from SVM import svmExperiment
 from Utils import train_single_epoch, eval_single_epoch
 
 
@@ -50,7 +53,7 @@ def execPipeline(model, experimentName):
     model.to(device)
     regressionLossFunction = torch.nn.MSELoss()
     classificationLossFunction = torch.nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, betas=[0.9, 0.98], eps=10e-9)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.00001, betas=[0.9, 0.98], eps=10e-9)
 
     epochRegLoss = np.empty(shape=(1, epochs))
     epochClassLoss = np.empty(shape=(1, epochs))
@@ -176,10 +179,10 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
     os.environ['CUDA_LAUNCH_BLOCKING']="1"
 
-    AVAILABLE_MODELS = ['Vanilla', 'Perceiver', 'Linformer', 'BERT']
+    AVAILABLE_MODELS = ['Vanilla', 'Perceiver', 'Linformer', 'BERT', 'LSTM', 'MLP-RSS', 'CNN-RSS', 'SVM']
 
     # Define constants
-    selectedModel = AVAILABLE_MODELS[0]
+    selectedModel = AVAILABLE_MODELS[7]
 
     # Run training, evaluation and gather statistics for selected model
     if selectedModel == "BERT":
@@ -204,17 +207,32 @@ if __name__ == "__main__":
             seq_len=620,
             depth=6
         )
+    elif selectedModel == "LSTM":
+        model = LSTMModel(
+            input_dim=620,
+            hidden_dim=512
+        )
+    elif selectedModel == "MLP-RSS":
+        model = MLPRSS(
+            input_dim=620
+        )
+    elif selectedModel == "CNN-RSS":
+        model = CNNRSS(
+            input_dim=1
+        )
+    elif selectedModel == "SVM":
+        svmExperiment()
     else:
         # Base model includes:
-        # N = 6 Layers
+        # N = 2 Layers => Adjusted to reduce training time
         # D_model = 512
         # h = 8 heads
-        # No dropout
+        # Built-in dropout
         model = VanillaTransformer(
             embed_dim=512,
             src_vocab_size=100,
             seq_length=620,
-            num_layers=6,
+            num_layers=2,
             expansion_factor=4,
             n_heads=8
         )
